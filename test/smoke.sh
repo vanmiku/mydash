@@ -1134,6 +1134,8 @@ $CLI rm smoke/battle-plan --version 1 >/dev/null
 check "rm 单个版本" "test ! -d '$MYDASH_DATA/smoke/battle-plan/v1' && test -d '$MYDASH_DATA/smoke/battle-plan/v2'"
 $CLI rm other/chart >/dev/null
 check "rm 整个条目" "test ! -d '$MYDASH_DATA/other/chart'"
+(cd "$TMP" && printf '# 临时待办\n\n- [ ] 一件事\n' > rmtodo.md && CLAUDE_CODE_SESSION_ID=sess-rm $CLI publish rmtodo.md -p rmproj -s rm-todo --type todo >/dev/null)
+check "删掉的待办不再挂在「还开着的事」里" "grep -q 'rmproj/rm-todo' '$MYDASH_HOME/state/open-items.json' && $CLI rm rmproj/rm-todo >/dev/null && ! grep -q 'rmproj/rm-todo' '$MYDASH_HOME/state/open-items.json'"
 check "服务日志无报错" "! grep -i 'error' '$TMP/server.log' | grep -v smoke-probe | grep -c ."
 
 echo

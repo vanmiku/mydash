@@ -6,6 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DATA_DIR, baseUrl, cleanName, itemDir, readMeta, writeMetaAtomic, withLock, itemPath, projectPath, scanAll, latest } from '../lib/store.mjs';
+import { syncOpen } from '../lib/waiting.mjs';
 import { displayNameOf } from '../lib/names.mjs';
 import { detectProject } from '../lib/agents.mjs';
 import { cmdPublish, cmdRebuild, fmtTime, UsageError } from '../lib/publish.mjs';
@@ -182,6 +183,8 @@ async function cmdRm(pos, opts) {
     try { if (!fs.readdirSync(path.dirname(dir)).length) fs.rmdirSync(path.dirname(dir)); } catch {}
     process.stdout.write(t('Deleted {id} ({n} version)|Deleted {id} ({n} versions)', { id: target, n: meta.versions.length }) + '\n');
   }
+  // 删掉的审批单、待办不能还挂在「还开着的事」里（钩子据此提醒 agent）
+  await syncOpen(cleanName(project), cleanName(slug));
 }
 
 async function cmdDoctor(opts) {
