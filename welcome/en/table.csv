@@ -1,0 +1,6 @@
+Format,Shown as,Needs
+Markdown,Document,-
+PDF,Page images,swiftc or pdftoppm
+HTML,Web page on its own port,-
+CSV / Excel,Table,-
+Word / PowerPoint,Layout preview,LibreOffice

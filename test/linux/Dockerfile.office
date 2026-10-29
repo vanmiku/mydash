@@ -1,0 +1,6 @@
+# Linux check with LibreOffice and CJK fonts: Word previews keep Chinese text.
+FROM mydash-linux-test
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends libreoffice-writer-nogui fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
+USER tester
+CMD ["bash", "test/linux/office.sh"]

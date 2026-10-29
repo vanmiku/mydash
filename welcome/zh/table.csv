@@ -1,0 +1,6 @@
+格式,显示方式,需要
+Markdown,文档,-
+PDF,逐页图片,swiftc 或 pdftoppm
+HTML,单独端口里的网页,-
+CSV / Excel,表格,-
+Word / PPT,排版预览,LibreOffice

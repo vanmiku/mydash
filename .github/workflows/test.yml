@@ -1,0 +1,36 @@
+name: test
+on: [push, pull_request]
+jobs:
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - run: npm ci --omit=dev
+      - run: node test/i18n-check.mjs --missing-only
+      - run: bash test/smoke.sh
+      - run: node test/e2e.mjs --service none
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev
+      - run: node test/i18n-check.mjs --missing-only
+      - name: e2e, plain background process
+        run: node test/e2e.mjs --service none --port 4890
+      - name: e2e, Startup folder service
+        run: node test/e2e.mjs --service startup --port 4892
+      - name: setup.cmd entry point
+        shell: cmd
+        run: setup.cmd check --json
