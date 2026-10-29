@@ -136,7 +136,7 @@ function watchData() {
       if (parts.length > 2 && base !== 'meta.json') return; // 只关心 meta.json 和整个条目被删
       noteChange(parts[0], parts[1]);
     });
-    w.on('error', e => { console.error(new Date().toISOString(), 'fs.watch error, watching again:', e.code || e.message); try { w.close(); } catch {} INDEX = null; setTimeout(watchData, 1000).unref(); });
+    w.on('error', e => { console.error(new Date().toISOString(), 'fs.watch lost track of a folder (', e.code || e.message, '), watching again'); try { w.close(); } catch {} INDEX = null; setTimeout(watchData, 1000).unref(); });
   } catch (e) { console.error('fs.watch failed; falling back to periodic index refresh:', e.message); }
 }
 watchData();
