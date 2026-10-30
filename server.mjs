@@ -58,9 +58,26 @@ const CONTENT_HOSTS = new Set([...ALLOWED_HOSTS].flatMap(h => [CONTENT_PORT, HTT
 try { if (cfg.contentOrigin) CONTENT_HOSTS.add(new URL(cfg.contentOrigin).host); } catch {}
 // tailnet 里的名字：短名，或 <短名>.<tailnet>.ts.net（独立节点登录前还不知道 tailnet 名）
 const reEsc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const TN = (cfg.tailnetNames || []).map(reEsc).join('|');
-const TAILNET_MAIN = TN ? new RegExp(`^(${TN})(\\.[a-z0-9-]+\\.ts\\.net)?(:(80|${Number(cfg.publicPort || 80)}))?$`, 'i') : null;
-const TAILNET_CONTENT = TN ? new RegExp(`^(${TN})(\\.[a-z0-9-]+\\.ts\\.net)?:(${CONTENT_PORT}|${HTTPS_CONTENT_PORT})$`, 'i') : null;
+let TAILNET_MAIN = null, TAILNET_CONTENT = null;
+function setTailnetNames(names) {
+  const TN = names.map(reEsc).join('|');
+  TAILNET_MAIN = TN ? new RegExp(`^(${TN})(\\.[a-z0-9-]+\\.ts\\.net)?(:(80|${Number(cfg.publicPort || 80)}))?$`, 'i') : null;
+  TAILNET_CONTENT = TN ? new RegExp(`^(${TN})(\\.[a-z0-9-]+\\.ts\\.net)?:(${CONTENT_PORT}|${HTTPS_CONTENT_PORT})$`, 'i') : null;
+}
+setTailnetNames(cfg.tailnetNames || []);
+// 独立节点的真实名字：网址和放行的主机名都跟着它走，旧名字不再放行
+let nodeName = null;
+function useNodeName(short) {
+  const url = `http://${short}`, c = readConfig();
+  if (short === nodeName && c.baseUrl === url) return;
+  const old = (c.tailnetNames || []).filter(n => n !== short);
+  for (const n of old) { ALLOWED_HOSTS.delete(n); for (const p of [CONTENT_PORT, HTTPS_CONTENT_PORT]) CONTENT_HOSTS.delete(`${n}:${p}`); }
+  nodeName = short; setTailnetNames([short]);
+  if (c.baseUrl !== url || old.length) {
+    updateConfig(x => ({ ...x, baseUrl: url, tailnetNames: [short], allowedHosts: [...new Set([...(x.allowedHosts || []).filter(h => !old.includes(h)), short])] }));
+    console.log(new Date().toISOString(), `tailnet name: ${short}, address: ${url}`);
+  }
+}
 const hostOk = h => ALLOWED_HOSTS.has(h) || Boolean(TAILNET_MAIN?.test(h));
 const contentHostOk = h => CONTENT_HOSTS.has(h) || Boolean(TAILNET_CONTENT?.test(h));
 
@@ -919,5 +936,6 @@ if (cfg.access === 'tailscale-node') watchNode({
   tcp: () => (Array.isArray(readConfig().nodeTcp) ? readConfig().nodeTcp : []), // mydash forward 22 5900
   port: PORT, contentPort: CONTENT_PORT, httpsContentPort: HTTPS_CONTENT_PORT, log: m => console.log(new Date().toISOString(), m),
   // tailnet 开了 HTTPS：记下 HTTPS 网址（网页推送、设置页要用）
+  onName: useNodeName,
   onHttps: url => { if (readConfig().httpsUrl !== url) { updateConfig(c => ({ ...c, httpsUrl: url })); console.log(new Date().toISOString(), `https on: ${url}`); } },
 });

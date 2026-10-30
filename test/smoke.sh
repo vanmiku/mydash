@@ -1138,6 +1138,44 @@ check "rm 整个条目" "test ! -d '$MYDASH_DATA/other/chart'"
 check "删掉的待办不再挂在「还开着的事」里" "grep -q 'rmproj/rm-todo' '$MYDASH_HOME/state/open-items.json' && $CLI rm rmproj/rm-todo >/dev/null && ! grep -q 'rmproj/rm-todo' '$MYDASH_HOME/state/open-items.json'"
 check "服务日志无报错" "! grep -i 'error' '$TMP/server.log' | grep -v smoke-probe | grep -c ."
 
+echo "独立 Tailscale 节点的地址（假的 tailscale 命令）"
+fake_node() { # 目录 状态JSON
+  mkdir -p "$1/ts/bin" "$1/ts/state"; printf '%s' "$2" > "$1/fake-status.json"
+  cat > "$1/ts/bin/tailscale" <<EOF
+#!/bin/sh
+for a in "\$@"; do case "\$a" in status) cat "$1/fake-status.json"; exit 0;; serve) case "\$*" in *"serve status"*) echo '{}';; esac; exit 0;; up) exit 0;; esac; done
+EOF
+  printf '#!/bin/sh\nsleep 1\n' > "$1/ts/bin/tailscaled"; chmod +x "$1/ts/bin/tailscale" "$1/ts/bin/tailscaled"; : > "$1/ts/tailscaled.sock"
+}
+node_install() { # 目录 端口
+  env -u MYDASH_DATA -u MYDASH_PORT -u MYDASH_BASE_URL -u MYDASH_CONTENT_PORT MYDASH_HOME="$1" node "$ROOT/bin/mydash.mjs" setup install --access tailscale-node --hostname mdfakenode --lang en --port "$2" --content-port "$(($2+1))" --service none --bin-dir "$1/bin" --json 2>/dev/null > "$1/install.json"
+  env -u MYDASH_DATA -u MYDASH_PORT -u MYDASH_BASE_URL -u MYDASH_CONTENT_PORT MYDASH_HOME="$1" node "$ROOT/bin/mydash.mjs" uninstall >/dev/null 2>&1
+}
+jq_js() { node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(eval(process.argv[2])?0:1)' "$1" "$2"; }
+NN="$TMP/node-tests"; mkdir -p "$NN"
+fake_node "$NN/pending" '{"BackendState":"NeedsLogin","AuthURL":"https://login.tailscale.com/a/fake"}'
+node_install "$NN/pending" $((PORT+50))
+check "还没批准：安装给的是本机地址，不是打不开的短名" "jq_js '$NN/pending/install.json' 'r.url===\"http://127.0.0.1:$((PORT+50))/\"'"
+check "还没批准：列出批准链接" "jq_js '$NN/pending/install.json' 'r.human.some(h=>h.id===\"tailscale-node-login\"&&h.url)'"
+fake_node "$NN/taken" '{"BackendState":"Running","Self":{"DNSName":"mdfakenode-1.tailfake.ts.net."},"MagicDNSSuffix":"tailfake.ts.net"}'
+node_install "$NN/taken" $((PORT+54))
+check "名字被占用：安装给的是真实名字" "jq_js '$NN/taken/install.json' 'r.url===\"http://mdfakenode-1/\"&&r.localUrl===\"http://127.0.0.1:$((PORT+54))/\"'"
+check "名字被占用：告诉用户" "jq_js '$NN/taken/install.json' 'r.human.some(h=>h.id===\"tailscale-node-name\")'"
+# 服务开着时批准、或者名字变了：地址和放行的主机名自动跟上
+LV="$NN/live"; fake_node "$LV" '{"BackendState":"Running","Self":{"DNSName":"mdfakenode-1.tailfake.ts.net."}}'
+LP=$((PORT+58))
+echo "{\"access\":\"tailscale-node\",\"hostname\":\"mdfakenode\",\"tailnetNames\":[\"mdfakenode\"],\"allowedHosts\":[\"mdfakenode\"],\"port\":$LP,\"contentPort\":$((LP+1)),\"baseUrl\":\"http://mdfakenode\"}" > "$LV/config.json"
+env -u MYDASH_DATA -u MYDASH_PORT -u MYDASH_BASE_URL -u MYDASH_CONTENT_PORT MYDASH_HOME="$LV" node "$ROOT/server.mjs" > "$NN/live.log" 2>&1 &
+LVP=$!
+for i in $(seq 1 40); do curl -sf "http://127.0.0.1:$LP/healthz" >/dev/null && break; sleep 0.25; done
+for i in $(seq 1 40); do grep -q 'mdfakenode-1' "$LV/config.json" && break; sleep 0.25; done
+sleep 0.2
+check "节点改名后配置里的地址跟上" "jq_js '$LV/config.json' 'r.baseUrl===\"http://mdfakenode-1\"&&r.tailnetNames.join()===\"mdfakenode-1\"&&!r.allowedHosts.includes(\"mdfakenode\")'"
+check "节点改名后真实名字能打开" "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: mdfakenode-1' http://127.0.0.1:$LP/)\" = 200 ]"
+check "节点改名后内容端口也认真实名字" "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: mdfakenode-1:$((LP+1))' http://127.0.0.1:$((LP+1))/healthz)\" != 421 ]"
+check "节点改名后旧名字不再放行" "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: mdfakenode' http://127.0.0.1:$LP/)\" = 421 ]"
+kill $LVP 2>/dev/null
+
 echo
 echo "通过 ${PASS}，失败 ${FAIL}"
 [ $FAIL -gt 0 ] && { echo "--- 服务日志 ---"; tail -20 "$TMP/server.log"; }

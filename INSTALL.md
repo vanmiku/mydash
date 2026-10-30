@@ -48,7 +48,7 @@ Ask everything in `questions` in one message, with the recommended answers pre-s
 1. **Where should it open?**
    - `local`: only on this computer, at `http://127.0.0.1:4870/`.
    - `tailscale`: on their other devices too, phone included, through the Tailscale they already use, at `http://<this-machine>/`. Recommended when `check` shows Tailscale running.
-   - `tailscale-node`: through Tailscale under its own name, `http://mydash/`. This adds one device to their tailnet and needs one approval click. On macOS it builds Tailscale from source, so it needs Go. Not available on Windows.
+   - `tailscale-node`: through Tailscale under its own name, `http://mydash/`. This adds one device to their tailnet and needs one approval click. Every device that opens this address needs Tailscale, this computer included; without it, this computer uses `http://127.0.0.1:4870/`. If the tailnet already has a device called `mydash` (an old computer, say), Tailscale names this one `mydash-1`, and that becomes the address. On macOS it builds Tailscale from source, so it needs Go. Not available on Windows.
 2. **Same Wi-Fi?** Whether other devices on the same Wi-Fi (or wired network) may open it too. They log in once with an access code; this computer and the tailnet never need it. Add `--lan on` if yes. Recommend it only on a home network the user trusts.
 3. **Language** of the pages: `en` or `zh`. Default to the language the user writes in.
 4. **Timezone**, only when the server clock is UTC (common on cloud servers). Use an IANA name such as `Europe/London` or `Asia/Shanghai`.
@@ -62,10 +62,13 @@ Ask everything in `questions` in one message, with the recommended answers pre-s
 
 It takes 10–60 seconds. Building the Tailscale node on macOS can take several minutes. The result has:
 
-- `ok`, and `url`: the address to give the user.
+- `ok`, and `url`: the address to give the user. With `tailscale-node` it is `http://127.0.0.1:<port>/` until the device is approved, then switches to the device's real name on its own.
+- `localUrl`: the address that always works on this computer.
 - `steps`: what was done. Any step with `ok: false` has the reason in `detail`.
 - `human`: things only the user can do. Show each one to the user, with its `url` or `command`, and wait for them:
   - `tailscale-node-login`: the user opens the link and approves the new device. Forwarding starts automatically within a minute.
+  - `tailscale-node-name`: the name was taken, so the device has a different one. Tell the user the real address and how to get the name back.
+  - `tailscale-this-computer`: this computer is not on the tailnet. Tell the user to use `localUrl` here, or to install Tailscale on it.
   - `tailscale-operator` (Linux): the user runs `sudo tailscale set --operator=$USER`, then you run step 4 again.
   - `tailscale-login`: the user logs in to Tailscale, then you run step 4 again.
   - Entries with `"agent": true` you may do yourself after asking. For example, add `~/.local/bin` to `PATH` in their shell profile.

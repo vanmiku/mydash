@@ -23,7 +23,7 @@ Install mydash for me by following https://github.com/vanmiku/mydash/blob/main/I
 The agent checks your machine and asks you a few questions: where mydash should open (only this computer, or your phone too through Tailscale), which language, and your timezone if it's on a server. Then it installs everything and gives you the link. You only step in for what needs you, such as approving a new Tailscale device or typing a `sudo` password.
 
 **Needs:** macOS, Linux or Windows 10/11, and Node.js 20 or newer.
-**Optional:** [Tailscale](https://tailscale.com) to open it from your phone anywhere; or `--lan on` to open it on the same Wi-Fi with an access code; LibreOffice for Word and PowerPoint previews.
+**Optional:** [Tailscale](https://tailscale.com) to open it from your phone anywhere (every device that opens it needs Tailscale); or `--lan on` to open it on the same Wi-Fi with an access code; LibreOffice for Word and PowerPoint previews.
 
 <details>
 <summary>Installing by hand</summary>

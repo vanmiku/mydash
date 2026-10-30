@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `--access tailscale-node`: the address now follows the device's real name. If the name is taken (`mydash-1`), mydash uses and accepts that name, and tells you; before it kept giving `http://mydash/` and refused the real name.
+- `--access tailscale-node`: before the device is approved, install and `mydash publish` give the local address, and switch within a minute after the approval.
+- Install and `mydash doctor` say plainly when this computer is not on the tailnet, and which address to use instead. The install result has a new `localUrl` field.
+
 ## 0.1.0 (2026-10)
 
 First public version.

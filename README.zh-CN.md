@@ -24,7 +24,7 @@ agent 会先检查你的机器，问你几个问题：mydash 在哪里打开（�
 
 **需要：** macOS、Linux 或 Windows 10/11，以及 Node.js 20 或更新版本。
 **可选：**
-- [Tailscale](https://tailscale.com)：用来在手机上随时随地打开。
+- [Tailscale](https://tailscale.com)：用来在手机上随时随地打开（打开它的每台设备都要装 Tailscale）。
 - `--lan on`：同一 WiFi 下的设备凭访问码打开。
 - LibreOffice：用来生成 Word 和 PPT 的排版预览。
 
