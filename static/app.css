@@ -277,6 +277,7 @@ main { flex: 1; width: 100%; max-width: 1160px; margin: 0 auto; padding: 4px 32p
 .ag-claude { --ag: var(--ag-claude); } .ag-codex { --ag: var(--ag-codex); } .ag-other { --ag: var(--ag-other); }
 .ag-badge { position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--ag); box-shadow: 0 0 0 1.5px var(--surface), inset 0 0 0 1px color-mix(in srgb, var(--ag) 40%, transparent); font-style: normal; }
 .ag-badge .ic { width: 11px; height: 11px; stroke-width: 2.5; }
+.ic.i-chatgpt { fill: currentColor; stroke: none; }
 .agent { display: inline-flex; align-items: center; gap: 4px; color: var(--ag); font-weight: 500; white-space: nowrap; }
 .agent .ic { width: 13px; height: 13px; stroke-width: 2.3; }
 .agent-seg button .ic { width: 13px; height: 13px; stroke-width: 2.3; color: var(--ag); }
