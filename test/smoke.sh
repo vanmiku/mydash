@@ -1141,11 +1141,11 @@ check "服务日志无报错" "! grep -i 'error' '$TMP/server.log' | grep -v smo
 echo "新版本（只跟正式版本的标签）"
 check "版本号比较和挑最新的标签" "node -e 'import(\"$ROOT/lib/update.mjs\").then(m=>process.exit(m.latestTag([\"v0.1.0\",\"v0.10.0\",\"v0.9.9\",\"v1.0.0-rc1\",\"main\"])===\"v0.10.0\"&&m.cmpVer(\"0.1.10\",\"0.1.9\")>0&&m.cmpVer(\"v1.0.0\",\"1.0.0\")===0?0:1))'"
 UG="$TMP/upd"; mkdir -p "$UG"
-git init -q --bare "$UG/origin.git"
+git init -q --bare -b main "$UG/origin.git"
 git init -q -b main "$UG/work" && git -C "$UG/work" -c user.name=t -c user.email=t@t commit -q --allow-empty -m one && git -C "$UG/work" tag v0.0.1 \
   && git -C "$UG/work" -c user.name=t -c user.email=t@t commit -q --allow-empty -m two && git -C "$UG/work" tag v99.0.0 \
   && git -C "$UG/work" push -q "$UG/origin.git" main --tags 2>/dev/null
-git clone -q "$UG/origin.git" "$UG/src" 2>/dev/null && git -C "$UG/src" reset -q --hard v0.0.1
+git clone -q -b main "$UG/origin.git" "$UG/src" 2>/dev/null && git -C "$UG/src" reset -q --hard v0.0.1
 OLD=$(git -C "$UG/src" rev-parse HEAD)
 node -e 'const f=process.argv[1],c=JSON.parse(require("fs").readFileSync(f,"utf8"));c.source=process.argv[2];c.sourceRemote=process.argv[3];require("fs").writeFileSync(f,JSON.stringify(c))' "$MYDASH_HOME/config.json" "$UG/src" "$UG/origin.git"
 check "设置页能看有没有新版本：问远端的标签" "POSTJ -H 'X-Mydash: 1' -d '{\"action\":\"check\"}' '$B/api/update' >/dev/null; curl -s '$B/api/update' | node -e 'const s=JSON.parse(require(\"fs\").readFileSync(0));process.exit(s.available&&s.latest.version===\"99.0.0\"&&s.canUpdate?0:1)'"

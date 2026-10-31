@@ -98,8 +98,10 @@ try {
   const work = path.join(tmp, 'upd-work'), origin = path.join(tmp, 'upd-origin.git'), usrc = path.join(tmp, 'upd-src');
   fs.cpSync(ROOT, work, { recursive: true, filter: f => !['.git', 'node_modules'].includes(path.basename(f)) });
   git(work, 'init', '-q', '-b', 'main'); git(work, 'add', '-A'); git(work, 'commit', '-q', '-m', 'release'); git(work, 'tag', `v${cur}`);
-  git(tmp, 'init', '-q', '--bare', origin); git(work, 'push', '-q', origin, 'main', '--tags');
-  git(tmp, 'clone', '-q', origin, usrc);
+  // name the branch everywhere: a bare repository's default branch follows the machine's git config (master on CI)
+  git(tmp, 'init', '-q', '--bare', '-b', 'main', origin); git(work, 'push', '-q', origin, 'main', '--tags');
+  const cl = git(tmp, 'clone', '-q', '-b', 'main', origin, usrc);
+  ok('test repository cloned', cl.status === 0 && git(usrc, 'rev-parse', 'HEAD').status === 0, cl.stderr);
   const pj = path.join(work, 'package.json');
   fs.writeFileSync(pj, fs.readFileSync(pj, 'utf8').replace(`"version": "${cur}"`, `"version": "${next}"`));
   git(work, 'commit', '-q', '-am', 'next release'); git(work, 'tag', `v${next}`); git(work, 'push', '-q', origin, 'main', '--tags');
