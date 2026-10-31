@@ -160,7 +160,7 @@ flowchart LR
 | `mydash forward 22 5900` · `mydash forward off` | 让 mydash 自己的 Tailscale 节点转发 SSH、屏幕共享 |
 | `mydash doctor [--json]` | 检查是否正常，并给出修法 |
 | `mydash integrate claude\|codex [--dry-run] [--remove] [--no-hooks]` | 让 agent 用上 mydash |
-| `mydash update` · `mydash uninstall [--purge]` | 从 git 更新、卸载 |
+| `mydash update [--check]` · `mydash uninstall [--purge]` | 更新到最新的正式版本（有新版本时首页也会提醒）、卸载 |
 
 ## 状态
 

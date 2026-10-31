@@ -37,6 +37,7 @@ import { readMap, markRead, markUnread, markAllRead } from './lib/readstate.mjs'
 import { projectNames, setProjectName } from './lib/names.mjs';
 import { pins, setPin } from './lib/pins.mjs';
 import { watchNode } from './lib/tailscale.mjs';
+import { checkForUpdate, startUpdate, status as updateStatus, readUpdate, writeUpdate } from './lib/update.mjs';
 import { classify, lanHostOk, validSession, checkCode, createSession, sessionCookie, rateLimited, noteFailure, accessCode, prettyCode, lanUrls, lanAddresses, loginUrl, qrSvg, deviceCount } from './lib/lan.mjs';
 
 const APP = path.dirname(fileURLToPath(import.meta.url));
@@ -235,6 +236,30 @@ function mergeChannel(type, input, old, clear = []) {
 }
 function broadcast(event, data) { const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`; for (const c of clients) c.write(msg); }
 
+// 新版本：每小时看一眼（真正去问远端 20 小时才一次）。有新版本时推送一次；设置成自动的，夜里 3–5 点装上。
+// 自动更新完、新的服务起来以后，把结果推送给用户（手动点的在网页上就看到了）
+async function updateTick() {
+  const c = readConfig(); if (c.client) return;
+  const link = `${(c.httpsUrl || baseUrl()).replace(/\/+$/, '')}/settings#update`;
+  const last = readUpdate().last;
+  if (last?.auto && !last.pushed) {
+    writeUpdate(x => ({ ...x, last: { ...x.last, pushed: true } }));
+    await sendPush({ title: last.ok ? t('mydash updated to {v}', { v: last.to }) : t('mydash could not update to {v}', { v: last.to }), body: (last.ok ? last.human?.[0] || '' : last.error || '').slice(0, 300), link }).catch(() => {});
+  }
+  const s = await checkForUpdate();
+  if (s.mode === 'off' || !s.available || s.running) return;
+  const v = s.latest.version;
+  if (readUpdate().notified !== v) {
+    writeUpdate(x => ({ ...x, notified: v }));
+    await sendPush({ title: t('mydash {v} is available', { v }), body: s.mode === 'auto' ? t('It installs itself tonight.') : t('Open Settings in mydash to update.'), link }).catch(() => {});
+  }
+  if (s.mode !== 'auto' || !s.canUpdate || readUpdate().autoTried === v) return;
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: c.timezone || undefined, hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
+  if (hour >= 3 && hour < 5) { writeUpdate(x => ({ ...x, autoTried: v })); const r = startUpdate({ auto: true }); console.log(new Date().toISOString(), `automatic update to ${v}: ${r.ok ? 'started' : r.error}`); }
+}
+setTimeout(() => updateTick().catch(e => console.log(new Date().toISOString(), 'update check:', e.message)), 60_000).unref();
+setInterval(() => updateTick().catch(e => console.log(new Date().toISOString(), 'update check:', e.message)), 3600_000).unref();
+
 // install.sh 更新代码后 touch 这个文件，服务自行退出、由 launchd 拉起新代码（系统级模式下不需要 sudo）
 const RESTART_FLAG = path.join(APP, '.restart');
 let restartStamp = fs.existsSync(RESTART_FLAG) ? fs.statSync(RESTART_FLAG).mtimeMs : 0;
@@ -369,6 +394,18 @@ async function handlePost(req, res) {
   if (origin) { try { if (!originOk(new URL(origin).host)) return json(403, { error: 'origin not allowed' }); } catch { return json(403, { error: 'origin not allowed' }); } }
   let body; try { body = JSON.parse(await readBody(req, 1024 * 1024) || '{}'); } catch (e) { return json(e.message === 'too large' ? 413 : 400, { error: e.message === 'too large' ? 'body too large (1 MB max)' : 'body is not JSON' }); }
   const url = new URL(req.url, 'http://local');
+  // 更新：check 马上去问远端；start 开始更新（服务会重启，页面轮询 GET /api/update 等它回来）；seen 收起上次的结果
+  if (url.pathname === '/api/update') {
+    if (body.action === 'check') return json(200, await checkForUpdate({ force: true }));
+    if (body.action === 'seen') { writeUpdate(x => (x.last ? { ...x, last: { ...x.last, seen: true } } : x)); return json(200, updateStatus()); }
+    if (body.action === 'start') {
+      const s = updateStatus();
+      if (!s.available) return json(409, { error: 'no newer version' });
+      const r = startUpdate();
+      return r.ok ? json(200, updateStatus()) : json(409, r);
+    }
+    return json(400, { error: 'action must be check, start or seen' });
+  }
   if (url.pathname === '/api/read') {
     const id = String(body.id || ''); const [project, slug] = id.split('/');
     const meta = project && slug ? readMeta(project, slug) : null;
@@ -528,6 +565,10 @@ async function handlePost(req, res) {
     if (body.prompts && typeof body.prompts === 'object') {
       const p = { ...(cur.prompts || {}), ...body.prompts };
       patch.prompts = { enabled: p.enabled !== false, chat: p.chat !== false, mode: p.mode === 'hold' ? 'hold' : 'parallel', codexMode: p.codexMode === 'hold' ? 'hold' : 'app', pushDelay: [-1, 0, 30, 60].includes(Number(p.pushDelay)) ? Number(p.pushDelay) : 30 };
+    }
+    if (body.updateMode !== undefined) {
+      if (!['notify', 'auto', 'off'].includes(body.updateMode)) return json(400, { error: 'updateMode must be notify, auto or off', field: 'updateMode' });
+      patch.update = { ...(cur.update || {}), mode: body.updateMode };
     }
     updateConfig(c => ({ ...c, ...patch }));
     INDEX = null;
@@ -844,6 +885,7 @@ async function handle(req, res) {
     const st = todoProgress(versionTodos(project, slug, latest(meta)), readResponses(project, slug).todos);
     return send(res, 200, JSON.stringify({ v: latest(meta).v, done: Object.fromEntries(st.items.map(x => [x.key, x.done])) }), 'application/json; charset=utf-8', { 'Cache-Control': 'no-store' });
   }
+  if (url.pathname === '/api/update') return send(res, 200, JSON.stringify(updateStatus()), 'application/json; charset=utf-8', { 'Cache-Control': 'no-store' });
   if (url.pathname === '/api/webpush') return send(res, 200, JSON.stringify({ publicKey: vapidKeys().publicKey, devices: subscriptions().length, httpsUrl: readConfig().httpsUrl || '' }), 'application/json; charset=utf-8', { 'Cache-Control': 'no-store' });
 
   if (segs[0] === 'p' && segs.length === 2) {

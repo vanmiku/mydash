@@ -1,5 +1,5 @@
 // End-to-end test that runs on macOS, Linux and Windows (no bash needed):
-// install into a temp home → publish → pages and content port → doctor → integrate / remove → uninstall.
+// install into a temp home → publish → pages and content port → doctor → integrate / remove → one-tap update → uninstall.
 // Usage: node test/e2e.mjs [--service none|launchd|systemd|startup] [--port 4890]
 import fs from 'node:fs';
 import os from 'node:os';
@@ -87,6 +87,44 @@ try {
   mydash(['integrate', 'claude', '--remove']); mydash(['integrate', 'codex', '--remove']);
   ok('Claude Code rule removed cleanly', fs.readFileSync(path.join(env.MYDASH_CLAUDE_HOME, 'CLAUDE.md'), 'utf8') === '# mine\n');
   ok('Codex rules removed', !fs.existsSync(path.join(env.MYDASH_CODEX_HOME, 'rules', 'mydash.rules')));
+
+  // One-tap update from the page: the updater must outlive the service restart it causes
+  // (Windows taskkill /T, systemd cgroups, launchd). A local repository plays GitHub: the installed
+  // code as release vX, and a vX+1 that only bumps the version.
+  console.log('update');
+  const git = (cwd, ...a) => spawnSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'core.autocrlf=false', ...a], { cwd, encoding: 'utf8', timeout: 120_000 });
+  const cur = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  const next = cur.replace(/\d+$/, n => String(Number(n) + 1));
+  const work = path.join(tmp, 'upd-work'), origin = path.join(tmp, 'upd-origin.git'), usrc = path.join(tmp, 'upd-src');
+  fs.cpSync(ROOT, work, { recursive: true, filter: f => !['.git', 'node_modules'].includes(path.basename(f)) });
+  git(work, 'init', '-q', '-b', 'main'); git(work, 'add', '-A'); git(work, 'commit', '-q', '-m', 'release'); git(work, 'tag', `v${cur}`);
+  git(tmp, 'init', '-q', '--bare', origin); git(work, 'push', '-q', origin, 'main', '--tags');
+  git(tmp, 'clone', '-q', origin, usrc);
+  const pj = path.join(work, 'package.json');
+  fs.writeFileSync(pj, fs.readFileSync(pj, 'utf8').replace(`"version": "${cur}"`, `"version": "${next}"`));
+  git(work, 'commit', '-q', '-am', 'next release'); git(work, 'tag', `v${next}`); git(work, 'push', '-q', origin, 'main', '--tags');
+  const cfgPath = path.join(env.MYDASH_HOME, 'config.json');
+  const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+  fs.writeFileSync(cfgPath, JSON.stringify({ ...cfg, source: usrc, sourceRemote: origin, toolPath: process.env.PATH }, null, 2));
+  const post = body => new Promise(resolve => {
+    const req = http.request({ hostname: '127.0.0.1', port, path: '/api/update', method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mydash': '1' }, timeout: 60_000 }, res => {
+      let text = ''; res.setEncoding('utf8'); res.on('data', d => { text += d; }); res.on('end', () => { try { resolve(JSON.parse(text)); } catch { resolve({ status: res.statusCode, text }); } });
+    });
+    req.on('error', e => resolve({ error: String(e) })); req.end(JSON.stringify(body));
+  });
+  const seen = await post({ action: 'check' });
+  ok(`sees v${next} in the repository`, seen.available && seen.latest?.version === next, JSON.stringify(seen).slice(0, 300));
+  await post({ action: 'start' });
+  let st = {};
+  for (let i = 0; i < 150; i++) {
+    await sleep(2000);
+    const r = await get(`${B}/api/update`);
+    try { st = JSON.parse(r.text); } catch { continue; }
+    if (st.current === next && !st.running) break;
+  }
+  const ulog = (() => { try { return fs.readFileSync(path.join(env.MYDASH_HOME, 'logs', 'update.log'), 'utf8').slice(-1500); } catch { return 'no update.log'; } })();
+  ok(`one-tap update installs v${next} and the service comes back`, st.current === next && st.last?.ok === true, JSON.stringify(st).slice(0, 400) + '\n' + ulog);
+  ok('page still answers after the update', (await get(`${B}/healthz`)).status === 200);
 
   console.log('uninstall');
   const un = json(mydash(['uninstall', '--purge', '--json']));

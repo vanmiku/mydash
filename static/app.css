@@ -1100,3 +1100,26 @@ mark.cm-hl { background: var(--pin-soft); color: inherit; border-bottom: 2px sol
 /* 别的机器传来的条目：标出机器名 */
 .host-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--text-2); white-space: nowrap; }
 .host-tag .ic { width: 12px; height: 12px; }
+
+/* 新版本：首页顶上那条、设置页的状态 */
+.upd-bar { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; padding: 11px 13px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); background: var(--accent-soft); color: var(--text); font-size: 13.5px; line-height: 1.5; }
+.upd-bar > .ic { width: 17px; height: 17px; color: var(--accent); }
+.upd-main { flex: 1; min-width: 0; }
+.upd-notes { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); }
+.upd-acts { display: flex; align-items: center; gap: 10px; flex: none; }
+.upd-link { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.upd-btn { height: 30px; padding: 0 13px; border: 0; border-radius: 8px; background: var(--accent-solid); color: #fff; font: 600 13px/1 var(--sans); cursor: pointer; }
+.upd-btn.quiet { background: var(--surface); color: var(--text-2); border: 1px solid var(--border); }
+.upd-btn:disabled { opacity: .55; cursor: default; }
+.upd-bar code { font-size: 12.5px; }
+.upd-running > .ic { animation: upd-spin 1.2s linear infinite; }
+.upd-done { border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); background: color-mix(in srgb, var(--ok) 9%, var(--surface)); }
+.upd-done > .ic { color: var(--ok); }
+.upd-failed { border-color: color-mix(in srgb, var(--unread) 40%, var(--border)); background: var(--unread-soft); }
+.upd-failed > .ic { color: var(--unread); }
+@keyframes upd-spin { to { transform: rotate(360deg); } }
+@media (max-width: 640px) { .upd-bar { flex-wrap: wrap; } .upd-acts { width: 100%; justify-content: flex-end; } }
+.set-upd-state { margin: 10px 0 0; font-size: 13.5px; color: var(--text-2); line-height: 1.6; }
+.set-upd-state a { color: var(--accent); text-decoration: none; }
+.set-upd-btns { display: flex; gap: 8px; margin-top: 14px; }
+.set-upd-btns .upd-go { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; }

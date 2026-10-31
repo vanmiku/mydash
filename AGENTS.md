@@ -25,6 +25,7 @@ This file is for coding agents changing mydash itself. To install mydash for a u
 | `lib/quiet.mjs` | Muted projects, manual and automatic archive |
 | `lib/search.mjs` | Full-text search over the latest versions |
 | `lib/notify.mjs`, `lib/pushguide.mjs` | Notification channels (Bark, ntfy, Telegram, Pushover, group webhooks, email, web push) and the daily summary; the step-by-step setup guide for each channel on the settings page |
+| `lib/update.mjs` | Updates: the daily check against the source repository's release tags, the state in `state/update.json`, starting an update from the page so it outlives the service restart. `mydash update` itself is in `lib/setup.mjs` |
 | `lib/remote.mjs` | Publishing from another machine with a token (client, token store); server side is `/api/remote/*` in `server.mjs` |
 | `lib/lan.mjs` | Same-Wi-Fi access with an access code |
 | `lib/maintain.mjs` | `rebuild --dedup`, `rebuild --categories`, `prune` |
@@ -57,6 +58,18 @@ MYDASH_HOME=/tmp/md-test /tmp/md-test/bin/mydash uninstall --purge
 ```
 
 Services installed outside the default `~/.mydash` get a suffixed name (`mydash.server-1a2b3c`), so they never collide with the real one.
+
+## Releasing
+
+Installed copies only see releases: the tags `vX.Y.Z` (no suffix). A push to `main` reaches nobody until it is tagged; a tag reaches everyone, either as a notice or, for users who chose it, as a night-time install. So tag only what passed CI on all three systems.
+
+```bash
+npm version 0.1.2 --no-git-tag-version   # package.json and package-lock.json
+# CHANGELOG.md: a section for the version; say if users must do something by hand
+git commit -am "mydash 0.1.2" && git push origin main      # wait for CI
+git tag -a v0.1.2 -m "mydash 0.1.2" && git push origin v0.1.2
+gh release create v0.1.2 --title "mydash 0.1.2" --notes-file <notes>
+```
 
 ## Conventions
 

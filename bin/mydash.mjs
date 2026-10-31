@@ -13,6 +13,7 @@ import { cmdPublish, cmdRebuild, fmtTime, UsageError } from '../lib/publish.mjs'
 import { health, printChecks, allRequiredOk } from '../lib/checks.mjs';
 import { integrate, hookHealth, status as integrationStatus } from '../lib/integrate.mjs';
 import { cmdSetup, uninstall, update, cmdLan, printUninstall } from '../lib/setup.mjs';
+import { checkForUpdate } from '../lib/update.mjs';
 import { cmdDedup, cmdPrune, cmdCategories } from '../lib/maintain.mjs';
 import { cmdFeedback, cmdApprovals, cmdTodos, cmdAsks } from '../lib/feedback.mjs';
 import { cmdAsk } from '../lib/askcli.mjs';
@@ -39,7 +40,8 @@ Usage
   mydash integrate claude|codex|all [--dry-run] [--remove] [--no-hooks]   teach Claude Code / Codex to use mydash
   mydash lan [on|off|reset]                        open it on the same Wi-Fi, with an access code
   mydash notify bark|ntfy|telegram|pushover|webhook|email … [--name n] | remove <id> | daily <HH:MM|off> | test | off   push notifications; several of each kind are fine (or use the settings page)
-  mydash update | uninstall [--purge] | setup ...  maintenance (see INSTALL.md)
+  mydash update [--check]                          update to the latest release (--check: only see whether there is one)
+  mydash uninstall [--purge] | setup ...           maintenance (see INSTALL.md)
   sudo mydash service boot | login                 macOS: start at boot, before anyone logs in (after setup install --service launchd-boot) / back to starting at login
   mydash forward <port…> | off                     own Tailscale node only: also forward these ports, e.g. 22 5900 for SSH and Screen Sharing
 
@@ -80,7 +82,8 @@ Local images and files referenced from Markdown are included automatically.
   mydash integrate claude|codex|all [--dry-run] [--remove] [--no-hooks]   让 Claude Code / Codex 用上 mydash
   mydash lan [on|off|reset]                        同一 WiFi 下的设备凭访问码打开
   mydash notify bark|ntfy|telegram|pushover|webhook|email … [--name 名字] | remove <编号> | daily <HH:MM|off> | test | off   推送到手机，同一种也能加好几个（也可以在设置页里填）
-  mydash update | uninstall [--purge] | setup ...  维护（见 INSTALL.md）
+  mydash update [--check]                          更新到最新的正式版本（--check：只看有没有新版本）
+  mydash uninstall [--purge] | setup ...           维护（见 INSTALL.md）
   sudo mydash service boot | login                 macOS：开机就启动、不用登录（先 setup install --service launchd-boot）/ 改回登录后启动
   mydash forward <端口…> | off                     只用于独立 Tailscale 节点：顺带转发这些端口，比如 22 5900（SSH、屏幕共享）
 
@@ -108,7 +111,7 @@ Markdown 里引用的本地图片和本地文件会被自动一起带上。
 `,
 };
 
-const BOOL = new Set(['help', 'json', 'force', 'yes', 'all', 'dry-run', 'remove', 'purge', 'allow-secret', 'version', 'agents', 'dedup', 'categories', 'done', 'hooks', 'no-hooks', 'undo', 'multi']);
+const BOOL = new Set(['help', 'json', 'force', 'yes', 'all', 'dry-run', 'remove', 'purge', 'allow-secret', 'version', 'agents', 'dedup', 'categories', 'done', 'hooks', 'no-hooks', 'undo', 'multi', 'check', 'auto']);
 const ALIAS = { t: 'title', s: 'slug', p: 'project', n: 'note', m: 'main', h: 'help' };
 
 function parseArgs(argv) {
@@ -299,7 +302,25 @@ try {
     case 'notify': await cmdNotify(pos, opts); break;
     case 'remote': await cmdRemote(pos, opts); break;
     case 'uninstall': { const r = await uninstall({ purge: Boolean(opts.purge) }); if (opts.json) process.stdout.write(JSON.stringify(r) + '\n'); else printUninstall(r); if (r.ok === false) process.exitCode = 1; break; }
-    case 'update': { const r = await update(); if (opts.json) process.stdout.write(JSON.stringify(r) + '\n'); else { process.stdout.write((r.ok ? (r.updated ? t('Updated:') + '\n' + r.changes.map(c => '  ' + c).join('\n') : t('Already up to date; reinstalled.')) : r.error) + '\n'); if (r.url) process.stdout.write(r.url + '\n'); } if (!r.ok) process.exitCode = 1; break; }
+    case 'update': {
+      // --check：只问有没有新版本，不装
+      if (opts.check) {
+        const s = await checkForUpdate({ force: true });
+        if (opts.json) process.stdout.write(JSON.stringify({ ok: !s.error, ...s }) + '\n');
+        else process.stdout.write((!s.canCheck ? t('Cannot check: mydash was not installed from a git checkout.') : s.error ? s.error : s.available ? t('Version {v} is available (installed: {cur}). Run: mydash update', { v: s.latest.version, cur: s.current }) + (s.latest.url ? `\n${s.latest.url}` : '') : t('Already up to date ({v}).', { v: s.current })) + '\n');
+        if (s.error) process.exitCode = 1;
+        break;
+      }
+      const r = await update({ auto: Boolean(opts.auto) });
+      if (opts.json) process.stdout.write(JSON.stringify(r) + '\n');
+      else {
+        process.stdout.write((r.ok ? (r.updated ? t('Updated from {from} to {to}:', { from: r.from, to: r.to }) + '\n' + r.changes.map(c => '  ' + c).join('\n') : r.message) : r.error) + '\n');
+        if (r.releaseUrl) process.stdout.write(r.releaseUrl + '\n');
+        for (const h of r.human || []) process.stdout.write(`→ ${t('(needs the user) ')}${h.message}${h.url ? `\n  ${h.url}` : ''}${h.command ? `\n  ${h.command}` : ''}\n`);
+      }
+      if (!r.ok) process.exitCode = 1;
+      break;
+    }
     default: die(t('Unknown command: {cmd}; see mydash --help', { cmd }));
   }
 } catch (e) {

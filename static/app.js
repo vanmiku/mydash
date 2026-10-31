@@ -640,6 +640,28 @@
     document.addEventListener('mydash-prompt', e => { if (e.detail?.id === prData.id && prData.status === 'pending') location.reload(); });
   }
 
+  // ---------- 新版本：首页顶上那条和设置页里的按钮。点「更新」后服务会重启，一直问到它回来、不在更新了，再刷新页面 ----------
+  async function waitForUpdate() {
+    for (;;) {
+      await new Promise(r => setTimeout(r, 2500));
+      try { const r = await fetch('/api/update', { cache: 'no-store' }); if (r.ok && !(await r.json()).running) { location.reload(); return; } } catch {}
+    }
+  }
+  for (const b of $$('[data-upd]')) b.addEventListener('click', async () => {
+    const act = b.dataset.upd; b.disabled = true;
+    try {
+      const r = await fetch('/api/update', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mydash': '1' }, body: JSON.stringify({ action: act }) });
+      if (!r.ok) { toast(T('That did not work. Try again in a moment.')); b.disabled = false; return; }
+      if (act === 'seen') { $('#upd-bar')?.remove(); return; }
+      if (act === 'check') { location.reload(); return; }
+      const bar = $('#upd-bar');
+      if (bar) { bar.className = 'upd-bar upd-running'; $('.upd-t', bar).textContent = T('Updating mydash… This page comes back by itself in a minute or two.'); $('.upd-acts', bar).remove(); }
+      else toast(T('Updating mydash… This page comes back by itself in a minute or two.'), 120_000);
+      waitForUpdate();
+    } catch { toast(T('That did not work. Try again in a moment.')); b.disabled = false; }
+  });
+  if ($('#upd-bar.upd-running')) waitForUpdate();
+
   // ---------- 设置页：改了就自动保存；推送渠道可以加好几个，每个单独开关、试发、改、删 ----------
   const setForm = $('#set-form');
   if (setForm) {
@@ -658,6 +680,7 @@
     syncDaily();
     const autoData = () => ({
       autoArchiveDays: Number(q('autoArchiveDays').value), daily: q('dailyOn').checked ? q('daily').value : '',
+      ...(q('updateMode') ? { updateMode: q('updateMode').value } : {}),
       prompts: { enabled: q('promptsOn').checked, chat: q('promptsChat').checked, mode: q('promptsMode').value, codexMode: q('promptsCodex').value, pushDelay: Number(q('promptsPush').value) },
     });
     // 一次只存一份，轮到时再读表单：连着改两项，后存的一定是最新的样子

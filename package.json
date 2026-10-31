@@ -1,6 +1,6 @@
 {
   "name": "mydash",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "A self-hosted workbench for what your coding agents (Claude Code, Codex) make: publish plans, reports, PDFs, screenshots, HTML and Office files, read them rendered on your computer or phone.",
   "license": "MIT",

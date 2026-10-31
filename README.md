@@ -123,7 +123,7 @@ flowchart LR
 | `mydash forward 22 5900` · `mydash forward off` | pass SSH / Screen Sharing through mydash's own Tailscale node |
 | `mydash doctor [--json]` | check that everything works, with fixes |
 | `mydash integrate claude\|codex [--dry-run] [--remove] [--no-hooks]` | set up an agent to use mydash |
-| `mydash update` · `mydash uninstall [--purge]` | update from git, remove |
+| `mydash update [--check]` · `mydash uninstall [--purge]` | update to the latest release (mydash also tells you on the home page), remove |
 
 ## Status
 

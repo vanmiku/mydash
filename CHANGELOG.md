@@ -1,7 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-10-31)
 
+**If you installed 0.1.0, run `mydash update` once** (or ask your agent to). 0.1.0 cannot look for new versions; from 0.1.1 on, mydash tells you itself.
+
+- Updates follow releases: mydash checks the repository it was installed from once a day and shows "mydash 0.1.2 is available" at the top of the home page, with a one-tap Update button. Settings → Updates switches to installing at night (3–5 am), or off. `mydash update` installs the latest release, `mydash update --check` only looks. Commits on `main` between releases are not offered.
+- If the new version does not start, the update goes back to the previous one by itself.
+- A phone notification when a new version is available (if notifications are set up), and after an automatic update.
+- `mydash doctor` shows the installed version and whether a newer one exists.
+- Codex items show the ChatGPT mark in the source badge and filter.
 - `--access tailscale-node`: the address now follows the device's real name. If the name is taken (`mydash-1`), mydash uses and accepts that name, and tells you; before it kept giving `http://mydash/` and refused the real name.
 - `--access tailscale-node`: before the device is approved, install and `mydash publish` give the local address, and switch within a minute after the approval.
 - Install and `mydash doctor` say plainly when this computer is not on the tailnet, and which address to use instead. The install result has a new `localUrl` field.

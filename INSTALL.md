@@ -164,10 +164,13 @@ Other tools can also ask the user through mydash: `mydash ask "<question>" "<opt
 ## Updating
 
 ```bash
-mydash update --json
+mydash update --check --json   # only look: is there a newer release?
+mydash update --json           # install the latest release
 ```
 
-It pulls the checkout recorded at install time, reinstalls with the same options, and lists the new commits in `changes`.
+mydash follows releases (tags `vX.Y.Z`), not every commit on `main`. `update` fetches the tags into the checkout recorded at install time, moves it to the newest release, reinstalls with the same options, and lists the new commits in `changes`. If the new version does not start, it moves back and reinstalls the old one (`rolledBack: true`). It leaves the checkout alone if it has commits of its own.
+
+The service also checks once a day. By default it only tells the user: a line at the top of the home page with an Update button, and a phone notification if those are set up. In Settings → Updates the user can switch to installing at night (3–5 am in their timezone) or turn it off. `mydash doctor` shows the version in its `update` line.
 
 ## Uninstalling
 
